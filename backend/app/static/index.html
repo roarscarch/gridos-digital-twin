@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GridOS · Distribution Operations Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>" />
+<link rel="stylesheet" href="/static/style.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">⚡</div>
+    <div>
+      <div class="brand-row"><h1>GridOS</h1><span class="dms-tag">ADMS · DIGITAL TWIN</span></div>
+      <p id="subName">GRIDOS 33/11kV PRIMARY SUBSTATION · <span class="sim-tag">SIMULATION — NOT OPERATIONAL</span></p>
+    </div>
+  </div>
+  <div class="top-right">
+    <div class="shift"><span class="muted">OPERATOR</span><b id="opName">OP-1</b></div>
+    <div id="clock" class="clock">--:--:--</div>
+    <div id="health" class="pill"><span class="dot"></span><span id="healthTxt">link…</span></div>
+  </div>
+</header>
+
+<!-- system status band -->
+<div id="sysBand" class="sysband ok">
+  <div class="sys-left"><span id="sysState" class="sys-state">● SYSTEM NORMAL</span><span id="sysSub" class="sys-sub">all feeders energized · within SO limits</span></div>
+  <div class="sys-kpis">
+    <div class="sys-kpi"><span>P1</span><b id="cP1">0</b></div>
+    <div class="sys-kpi"><span>P2</span><b id="cP2">0</b></div>
+    <div class="sys-kpi"><span>P3</span><b id="cP3">0</b></div>
+    <div class="sys-kpi"><span>V<sub>MIN</sub></span><b id="kVmin">—</b></div>
+    <div class="sys-kpi"><span>LD<sub>MAX</sub></span><b id="kLdmax">—</b></div>
+    <div class="sys-kpi"><span>Σ LOSS</span><b id="kLoss">—</b></div>
+    <div class="sys-kpi"><span>PF</span><b id="kPf">—</b></div>
+  </div>
+</div>
+
+<main>
+  <!-- col 1: operating point + switching -->
+  <section class="card">
+    <div class="card-head"><h2>🎚 Operating point</h2><span class="hint">study mode</span></div>
+    <div class="slider-block">
+      <div class="slider-top"><label>System demand <b id="loadVal">1.00 pu</b></label><span class="sub" id="loadMw">2.50 MW</span></div>
+      <input id="load" type="range" min="0.2" max="2.5" step="0.05" value="1.0" />
+      <div class="ticks"><span>0.2 light</span><span>1.0 normal</span><span>2.5 extreme</span></div>
+    </div>
+    <div class="slider-block">
+      <div class="slider-top"><label>PV infeed <b id="solarVal">1.00 pu</b></label><span class="sub" id="solarMw">0.70 MW</span></div>
+      <input id="solar" type="range" min="0" max="2" step="0.05" value="1.0" />
+      <div class="ticks"><span>0 night</span><span>1.0 rated</span><span>2.0 surplus</span></div>
+    </div>
+    <div class="presets">
+      <button class="chip" onclick="preset(1,1)">Normal day</button>
+      <button class="chip" onclick="preset(1.5,0.15)">🌆 Evening peak</button>
+      <button class="chip" onclick="preset(0.55,1.8)">☀️ Midday PV export</button>
+      <button class="chip" onclick="preset(2.2,0)">🔥 N-0 stress</button>
+      <button class="chip" onclick="preset(1,0)">🌙 Night valley</button>
+    </div>
+    <h3 class="sec">🔀 Switching (N-1)</h3>
+    <div id="breakers" class="breakers"></div>
+    <div class="row btns">
+      <button class="btn primary" onclick="runSim()">▶ Execute load flow</button>
+      <button class="btn" onclick="runN1()">🔀 N-1 screen</button>
+      <label class="auto"><input type="checkbox" id="autoRun" checked /> live</label>
+    </div>
+    <h3 class="sec">📋 Study case</h3>
+    <div class="row btns">
+      <button class="btn sm" onclick="saveScenario()">💾 Save case</button>
+      <button class="btn sm" onclick="compareBase()">⚖ vs base case</button>
+      <button class="btn sm" onclick="exportCsv('alarms')">⬇ alarms.csv</button>
+      <button class="btn sm" onclick="exportCsv('buses')">⬇ buses.csv</button>
+    </div>
+    <div id="compareBox"></div>
+  </section>
+
+  <!-- col 2: single-line + alarms -->
+  <section class="card wide">
+    <div class="card-head">
+      <div><h2>🗺 11 kV single-line diagram</h2><span class="hint">SRC 33kV → T1 ONAN 5MVA → 11kV busbar → Fdr A (▲) / Fdr B (▼) · click CB ■ to switch</span></div>
+      <div class="legend"><span><i class="sw ok"></i>≤75%</span><span><i class="sw adv"></i>&gt;75%</span><span><i class="sw warn"></i>&gt;90%</span><span><i class="sw bad"></i>&gt;100% / de-en.</span></div>
+    </div>
+    <svg id="gridSvg" viewBox="0 0 760 360" width="100%"></svg>
+    <div id="assetDetail" class="detail">Select a bay, busbar section or feeder for equipment data 👆</div>
+  </section>
+
+  <!-- alarms -->
+  <section class="card span2 alarm-card">
+    <div class="card-head">
+      <h2>🚨 Alarm &amp; event list <span class="hint">ISA-18.2 priorities · click ACK to acknowledge</span></h2>
+      <div class="alm-filter">
+        <button class="tab active" onclick="almFilter('ALL',this)">All</button>
+        <button class="tab" onclick="almFilter('P1',this)">P1 crit</button>
+        <button class="tab" onclick="almFilter('P2',this)">P2 high</button>
+        <button class="tab" onclick="almFilter('P3',this)">P3 adv</button>
+      </div>
+    </div>
+    <div id="alarms" class="alarm-list"></div>
+  </section>
+
+  <!-- measurements -->
+  <section class="card span2">
+    <div class="card-head"><h2>📊 Bay measurements</h2>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('v',this)">Bus V (pu / kV)</button>
+        <button class="tab" onclick="switchTab('l',this)">Feeder loading</button>
+        <button class="tab" onclick="switchTab('e',this)">Power balance</button>
+        <button class="tab" onclick="switchTab('t',this)">N-1 summary</button>
+      </div>
+    </div>
+    <div class="charts">
+      <div class="chart-box" id="boxV"><h3>Busbar voltage — statutory band 0.95–1.05 pu (EN 50160 ±10%)</h3><canvas id="voltChart" height="140"></canvas></div>
+      <div class="chart-box hidden" id="boxL"><h3>Thermal loading vs continuous rating (OT / DT)</h3><canvas id="loadChart" height="140"></canvas></div>
+      <div class="chart-box hidden" id="boxE"><h3>Substation power balance — import / PV / losses</h3><canvas id="energyChart" height="140"></canvas></div>
+      <div class="chart-box hidden" id="boxT"><h3>N-1 contingency screen — worst P1 count per outage</h3><canvas id="n1Chart" height="140"></canvas><div id="n1Table" class="n1table"></div></div>
+    </div>
+  </section>
+
+  <!-- feeder cards -->
+  <section class="card span2">
+    <div class="card-head"><h2>🔌 Feeder boards</h2><span class="hint">per-feeder load, PV, head-end current</span></div>
+    <div id="feeders" class="feeder-grid"></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>📜 Operations log (SOE)</h2><button class="btn sm" onclick="loadEvents()">↻</button></div>
+    <div class="row btns"><input id="noteTxt" class="note-in" placeholder="Log a note… (e.g. Fdr B patrol dispatched)" /><button class="btn sm" onclick="addNote()">+ log</button></div>
+    <div id="soe" class="soe"><span class="muted">No entries.</span></div>
+    <div class="card-head" style="margin-top:12px"><h2>📁 Saved cases</h2><button class="btn sm" onclick="loadHistory()">↻</button></div>
+    <div id="history" class="history"><span class="muted">None yet.</span></div>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>🧾 Telemetry snapshot</h2>
+      <div><button class="btn sm" onclick="copyJson()">⧉</button><button class="btn sm" onclick="downloadJson()">⬇ JSON</button></div>
+    </div>
+    <pre id="json">{}</pre>
+  </section>
+</main>
+
+<footer>GridOS v0.3 CONTROL-ROOM BUILD · AC load flow (pandapower) · alarms P1/P2/P3 per ISA-18.2 practice · <b>SIMULATION ONLY — not a protection or SCADA system. No telecontrol.</b></footer>
+<div id="toasts"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
