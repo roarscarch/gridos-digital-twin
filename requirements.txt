@@ -1,9 +1,7 @@
-fastapi>=0.109
-uvicorn>=0.25
+fastapi>=0.109,<2
 pandapower>=2.13
-numpy>=1.26
+numpy>=1.26,<2.3
 scipy>=1.11
 pydantic>=2.5
 python-multipart>=0.0.9
-httpx>=0.25
-pytest>=8.0
+
